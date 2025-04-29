@@ -8,7 +8,7 @@ app.use(express.json());
 app.use(cors({ origin: ['http://localhost:3000', 'https://erotoro001.github.io'] }));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://myuser:mypassword@cluster0.mongodb.net/onlinecourses?retryWrites=true&w=majority';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://Erotoro:<db_password>@cluster0.mezaxrk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 
 // Підключення до MongoDB
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
