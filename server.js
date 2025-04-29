@@ -1,29 +1,65 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const app = express();
 
 app.use(express.json());
 app.use(cors({ origin: ['http://localhost:3000', 'https://erotoro001.github.io'] }));
 
-const db = new sqlite3.Database('database.db');
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'; // Використовуй змінну середовища на Render
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://myuser:mypassword@cluster0.mongodb.net/onlinecourses?retryWrites=true&w=majority';
 
-// Ініціалізація бази даних
-db.serialize(() => {
-  db.run('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, email TEXT, password TEXT)');
-  db.run('CREATE TABLE IF NOT EXISTS lessons (id INTEGER PRIMARY KEY, title TEXT)');
-  db.run('CREATE TABLE IF NOT EXISTS results (id INTEGER PRIMARY KEY, userId INTEGER, lessonId INTEGER, score INTEGER)');
-  // Очищаємо таблицю уроків і додаємо нові
-  db.run('DELETE FROM lessons');
-  db.run('INSERT OR IGNORE INTO lessons (id, title) VALUES (1, "Урок 1"), (2, "Урок 2"), (3, "Урок 3"), (4, "Урок 4")');
+// Підключення до MongoDB
+mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('MongoDB підключено'))
+  .catch(err => console.error('Помилка підключення до MongoDB:', err.message));
+
+// Схеми та моделі
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
 });
+const lessonSchema = new mongoose.Schema({
+  id: { type: Number, required: true, unique: true },
+  title: { type: String, required: true },
+});
+const resultSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  lessonId: { type: Number, required: true },
+  score: { type: Number, required: true },
+});
+
+const User = mongoose.model('User', userSchema);
+const Lesson = mongoose.model('Lesson', lessonSchema);
+const Result = mongoose.model('Result', resultSchema);
+
+// Ініціалізація уроків
+const initializeLessons = async () => {
+  try {
+    const lessonCount = await Lesson.countDocuments();
+    if (lessonCount === 0) {
+      await Lesson.insertMany([
+        { id: 1, title: 'Урок 1' },
+        { id: 2, title: 'Урок 2' },
+        { id: 3, title: 'Урок 3' },
+        { id: 4, title: 'Урок 4' },
+      ]);
+      console.log('Уроки ініціалізовані');
+    }
+  } catch (err) {
+    console.error('Помилка ініціалізації уроків:', err.message);
+  }
+};
+initializeLessons();
 
 // Middleware для перевірки JWT
 const authenticate = (req, res, next) => {
-  const token = req.headers.authorization;
-  if (!token) return res.status(401).json({ error: 'Токен відсутній' });
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Токен відсутній або неправильний формат' });
+  }
+  const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.userId = decoded.userId;
@@ -35,56 +71,58 @@ const authenticate = (req, res, next) => {
 };
 
 // Реєстрація
-app.post('/register', (req, res) => {
+app.post('/register', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email і пароль обов’язкові' });
-  db.run('INSERT INTO users (email, password) VALUES (?, ?)', [email, password], function (err) {
-    if (err) {
-      console.error('Помилка реєстрації:', err.message);
-      return res.status(500).json({ error: 'Помилка реєстрації' });
-    }
-    res.json({ message: 'Користувач зареєстрований', userId: this.lastID });
-  });
+  try {
+    const user = new User({ email, password });
+    await user.save();
+    res.json({ message: 'Користувач зареєстрований', userId: user._id });
+  } catch (err) {
+    console.error('Помилка реєстрації:', err.message);
+    res.status(500).json({ error: 'Помилка реєстрації' });
+  }
 });
 
 // Вхід
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email і пароль обов’язкові' });
-  db.get('SELECT * FROM users WHERE email = ? AND password = ?', [email, password], (err, user) => {
-    if (err) {
-      console.error('Помилка входу:', err.message);
-      return res.status(500).json({ error: 'Помилка сервера' });
-    }
+  try {
+    const user = await User.findOne({ email, password });
     if (!user) return res.status(401).json({ error: 'Неправильний email або пароль' });
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '1h' });
     res.json({ token });
-  });
+  } catch (err) {
+    console.error('Помилка входу:', err.message);
+    res.status(500).json({ error: 'Помилка сервера' });
+  }
 });
 
 // Отримання уроків
-app.get('/lessons', authenticate, (req, res) => {
-  db.all('SELECT * FROM lessons', [], (err, lessons) => {
-    if (err) {
-      console.error('Помилка завантаження уроків:', err.message);
-      return res.status(500).json({ error: 'Помилка завантаження уроків' });
-    }
+app.get('/lessons', authenticate, async (req, res) => {
+  try {
+    const lessons = await Lesson.find().sort({ id: 1 });
     res.json(lessons);
-  });
+  } catch (err) {
+    console.error('Помилка завантаження уроків:', err.message);
+    res.status(500).json({ error: 'Помилка завантаження уроків' });
+  }
 });
 
 // Збереження результатів
-app.post('/results', authenticate, (req, res) => {
+app.post('/results', authenticate, async (req, res) => {
   const { lessonId, score } = req.body;
   if (!lessonId || score === undefined) return res.status(400).json({ error: 'lessonId і score обов’язкові' });
   const userId = req.userId;
-  db.run('INSERT INTO results (userId, lessonId, score) VALUES (?, ?, ?)', [userId, lessonId, score], (err) => {
-    if (err) {
-      console.error('Помилка збереження результату:', err.message);
-      return res.status(500).json({ error: 'Помилка збереження результату' });
-    }
+  try {
+    const result = new Result({ userId, lessonId, score });
+    await result.save();
     res.json({ message: 'Результат збережено' });
-  });
+  } catch (err) {
+    console.error('Помилка збереження результату:', err.message);
+    res.status(500).json({ error: 'Помилка збереження результату' });
+  }
 });
 
 app.listen(3001, () => {
