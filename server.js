@@ -4,6 +4,7 @@ const cors = require('cors'); // Оголошуємо cors лише один р�
 const app = express();
 
 app.use(express.json());
+const cors = require('cors');
 app.use(cors({ origin: ['http://localhost:3000', 'https://erotoro001.github.io'] }));
 
 const db = new sqlite3.Database('database.db');
