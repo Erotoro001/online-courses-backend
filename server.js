@@ -13,7 +13,8 @@ db.serialize(() => {
   db.run('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, email TEXT, password TEXT)');
   db.run('CREATE TABLE IF NOT EXISTS lessons (id INTEGER PRIMARY KEY, title TEXT)');
   db.run('CREATE TABLE IF NOT EXISTS results (id INTEGER PRIMARY KEY, userId INTEGER, lessonId INTEGER, score INTEGER)');
-  db.run('INSERT OR IGNORE INTO lessons (id, title) VALUES (1, "Урок 1"), (2, "Урок 2")');
+  db.run('DELETE FROM lessons WHERE id > 2');
+  db.run('INSERT OR IGNORE INTO lessons (id, title) VALUES (1, "Урок 1"), (2, "Урок 2")');;
 });
 
 // Реєстрація
