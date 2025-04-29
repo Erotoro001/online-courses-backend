@@ -8,7 +8,10 @@ app.use(express.json());
 app.use(cors({ origin: ['http://localhost:3000', 'https://erotoro001.github.io'] }));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'GbJOlHezyu1Oew89';
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://Erotoro:<db_password>@cluster0.mezaxrk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://Erotoro:<db_password>@cluster0.mezaxrk.mongodb.net/onlinecourses?retryWrites=true&w=majority&appName=Cluster0';
+
+// Логування для діагностики
+console.log('MONGODB_URI:', MONGODB_URI);
 
 // Підключення до MongoDB
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -46,6 +49,8 @@ const initializeLessons = async () => {
         { id: 4, title: 'Урок 4' },
       ]);
       console.log('Уроки ініціалізовані');
+    } else {
+      console.log('Уроки вже ініціалізовані, кількість:', lessonCount);
     }
   } catch (err) {
     console.error('Помилка ініціалізації уроків:', err.message);
