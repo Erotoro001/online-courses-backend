@@ -6,7 +6,7 @@ const cors = require('cors');
 
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: 'http://localhost:3000' }));
+app.use(cors({ origin: ['http://localhost:3000', 'https://Erotoro001.github.io'] }));
 
 const db = new sqlite3.Database('./database.db');
 
