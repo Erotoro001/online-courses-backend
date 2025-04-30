@@ -12,7 +12,7 @@ app.use(express.json());
 // Налаштування CORS для дозволу запитів із фронтенду
 app.use(cors({
   origin: ['http://localhost:3000', 'https://erotoro001.github.io'],
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
@@ -24,7 +24,7 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://Erotoro:GbJOlHezyu
 // Логування для діагностики
 console.log('MONGODB_URI:', MONGODB_URI);
 
-// Підключення до MongoDB (видаляємо застарілі опції)
+// Підключення до MongoDB
 mongoose.connect(MONGODB_URI)
   .then(() => console.log('MongoDB підключено'))
   .catch(err => console.error('Помилка підключення до MongoDB:', err.message));
@@ -33,7 +33,18 @@ mongoose.connect(MONGODB_URI)
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true }, // Пароль буде захешований
+  firstName: { type: String, default: '' },
+  lastName: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now },
 });
+
+userSchema.pre('save', async function (next) {
+  if (this.isModified('password')) {
+    this.password = await bcrypt.hash(this.password, 10);
+  }
+  next();
+});
+
 const User = mongoose.model('User', userSchema);
 
 // Схема уроків
@@ -168,6 +179,39 @@ app.get('/user-results', authenticate, async (req, res) => {
   } catch (err) {
     console.error('Помилка завантаження результатів:', err.message);
     res.status(500).json({ error: 'Помилка завантаження результатів' });
+  }
+});
+
+// Отримання профілю користувача
+app.get('/profile', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('-password');
+    if (!user) return res.status(404).json({ error: 'Користувач не знайдений' });
+    res.json(user);
+  } catch (error) {
+    console.error('Помилка завантаження профілю:', error.message);
+    res.status(500).json({ error: 'Помилка сервера' });
+  }
+});
+
+// Оновлення профілю користувача
+app.put('/profile', authenticate, async (req, res) => {
+  const { email, password, firstName, lastName } = req.body;
+
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'Користувач не знайдений' });
+
+    if (email) user.email = email;
+    if (password) user.password = password; // bcrypt хешування відбудеться в pre('save')
+    if (firstName !== undefined) user.firstName = firstName;
+    if (lastName !== undefined) user.lastName = lastName;
+
+    await user.save();
+    res.json({ message: 'Профіль оновлено' });
+  } catch (error) {
+    console.error('Помилка оновлення профілю:', error.message);
+    res.status(500).json({ error: 'Помилка сервера' });
   }
 });
 
