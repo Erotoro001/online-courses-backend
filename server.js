@@ -24,7 +24,7 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://Erotoro:GbJOlHezyu
 // Логування для діагностики
 console.log('MONGODB_URI:', MONGODB_URI);
 
-// Підключення до MongoDB
+// Підключення до MongoDB (видаляємо застарілі опції)
 mongoose.connect(MONGODB_URI)
   .then(() => console.log('MongoDB підключено'))
   .catch(err => console.error('Помилка підключення до MongoDB:', err.message));
